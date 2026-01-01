@@ -38,7 +38,11 @@ const toUrlFormat = (item) => {
     return `[#${item.payload.issue.number}](${item.payload.issue.html_url})`;
   }
   if (Object.hasOwnProperty.call(item.payload, "pull_request")) {
-    return `[#${item.payload.pull_request.number}](${item.payload.pull_request.html_url})`;
+    // GitHub Events API doesn't include html_url in pull_request object
+    // We need to construct it from repo name and PR number
+    const prNumber = item.payload.pull_request.number;
+    const repoName = item.repo.name;
+    return `[#${prNumber}](https://github.com/${repoName}/pull/${prNumber})`;
   }
 
   if (Object.hasOwnProperty.call(item.payload, "release")) {
@@ -137,7 +141,7 @@ const serializers = {
     )}`;
   },
   IssuesEvent: (item) => {
-    let emoji = "";
+    let emoji = "ℹ️";
 
     switch (item.payload.action) {
       case "opened":
@@ -156,11 +160,25 @@ const serializers = {
     )} in ${toUrlFormat(item.repo.name)}`;
   },
   PullRequestEvent: (item) => {
-    const emoji = item.payload.action === "opened" ? "💪" : "❌";
-    const line = item.payload.pull_request.merged
-      ? "🎉 Merged"
-      : `${emoji} ${capitalize(item.payload.action)}`;
-    return `${line} PR ${toUrlFormat(item)} in ${toUrlFormat(item.repo.name)}`;
+    let emoji = "ℹ️";
+    let actionText = capitalize(item.payload.action);
+
+    switch (item.payload.action) {
+      case "opened":
+        emoji = "💪";
+        actionText = "Opened";
+        break;
+      case "closed":
+        emoji = "❌";
+        actionText = "Closed";
+        break;
+      case "merged":
+        emoji = "🎉";
+        actionText = "Merged";
+        break;
+    }
+
+    return `${emoji} ${actionText} PR ${toUrlFormat(item)} in ${toUrlFormat(item.repo.name)}`;
   },
   ReleaseEvent: (item) => {
     return `🚀 ${capitalize(item.payload.action)} release ${toUrlFormat(
